@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Horus Simulator</title>
+  <link rel="stylesheet" href="/bower_components/bootstrap/dist/css/bootstrap.css">
+  <link rel="stylesheet" href="/bower_components/bootstrap/dist/css/bootstrap-theme.css">
+</head>
+<body>
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12">
+        <h1>Horus Simulator</h1>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-3">
+        <h2>Raspberry</h2>
+        <div class="row">
+          <div class="col-md-12">
+            <button id="cmd" class="btn btn-danger btn-lg btn-block">Commande</button>
+            <button id="close" class="btn btn-danger btn-lg btn-block">Fin de course fermeture</button>
+            <button id="open" class="btn btn-danger btn-lg btn-block">Fin de course ouverture</button>
+            <button id="sec1" class="btn btn-danger btn-lg btn-block">Cellule int</button>
+            <button id="sec2" class="btn btn-danger btn-lg btn-block">Cellule ext</button>
+            <button id="sec3" class="btn btn-danger btn-lg btn-block">Tranche principale</button>
+            <button id="btn" class="btn btn-danger btn-lg btn-block">Bouton d'arrêt</button>
+            <button id="pwr" class="btn btn-danger btn-lg btn-block">Alimentation</button>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <h2>Scénarios</h2>
+        <div class="row">
+          <button id="scCmd" class="btn btn-primary btn-lg btn-block">Bouton télécommande</button>
+          <button id="scOut" class="btn btn-info btn-lg btn-block">Je sors</button>
+          <button id="scIn" class="btn btn-info btn-lg btn-block">Je rentre</button>
+          <button id="scOuvreManuel" class="btn btn-info btn-lg btn-block">BAU et j'ouvre manuellement</button>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h2>Log</h2>
+        <pre id="log"></pre>
+      </div>
+    </div>
+  </div>
+  <script src="/bower_components/jquery/dist/jquery.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  var log = function(message) {
+    $('#log').append(message + '\n');
+  }
+
+  $(function() {
+    var socket = io('http://127.0.0.1:3000');
+    var pins = {cmd:0, close:1, open:0, sec1:0, sec2:0, sec3:0, btn:0, pwr:1};
+    socket.emit('init', pins);
+    $.each(pins, function(key, value) {
+      $('#' + key).toggleClass('btn-success', pins[key] == 1);
+      $('#' + key).toggleClass('btn-danger', pins[key] == 0);
+      $('#' + key).on('click', function(e) {
+        e.preventDefault();
+        pins[key] = pins[key] == 1 ? 0 : 1;
+        socket.emit('simulator', {pin:key, val: pins[key]});
+        $(this).toggleClass('btn-success', pins[key] == 1);
+        $(this).toggleClass('btn-danger', pins[key] == 0);
+      });
+    });
+
+    $('#scCmd').on('click', function(e) {
+      e.preventDefault();
+      log('Scénario lancement d\'une commande sur la porte');
+      pins.cmd = 0;
+      $('#cmd').click();
+      setTimeout(function(){
+        pins.cmd = 1;
+        $('#cmd').click();
+      }, 5000);
+      setTimeout(function() {
+        pins.close = 1; // Force la porte fermée, si la porte est déjà ouverte, le serveur ne renverra pas d'info
+        $('#close').click();
+        setTimeout(function() {
+          pins.open = 0; // Idem
+          $('#open').click();
+          setTimeout(function() {
+            pins.open = 1; // Idem
+            $('#open').click();
+            setTimeout(function() {
+              pins.close = 0; // Idem
+              $('#close').click();
+            }, 11000);
+          }, 7000);
+        }, 12000);
+      }, 4000);
+    });
+
+    $('#scOut').on('click', function(e) {
+      log('Scénario de sortie de véhicule');
+      if (pins.close == 1) {
+          log('Sortie impossible, porte fermée. Lancez une commande');
+      }
+      else {
+        pins.sec1 = 0;
+        $('#sec1').click();
+        setTimeout(function() {
+          pins.sec1 = 1;
+          $('#sec1').click();
+        },2000);
+        setTimeout(function() {
+          pins.sec2 = 0;
+          $('#sec2').click();
+          setTimeout(function() {
+            pins.sec2 = 1;
+            $('#sec2').click();
+          },2000);
+        },1000);
+      }
+    });
+
+    socket.on('log', log);
+  });
+  </script>
+</body>
+</html>
